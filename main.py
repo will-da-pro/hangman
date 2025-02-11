@@ -9,7 +9,6 @@ class Window:
         self.height: int = height
         self.xPos: int = x_pos
         self.yPos: int = y_pos
-        self.image = None
         self.window = curses.newwin(self.height, self.width, self.yPos, self.xPos)
         self.window.bkgd(' ', curses.color_pair(2))
         self.window.border(0)
@@ -25,6 +24,9 @@ class ImageWindow(Window):
         super().__init__(width, height, x_pos, y_pos)
 
         self.images = self.load_json('assets/images.json')["images"]
+        self.image = self.images['0']
+
+        self.render_image()
 
     def render_image(self) -> int:
         if self.image is None:
@@ -46,6 +48,8 @@ class WordBankWindow(Window):
 
         self.word: str = word
         self.guessed_letters: set[str] = guessed_letters
+
+        self.render_bank()
 
     def render_bank(self):
         for index, letter in enumerate(self.guessed_letters):
@@ -85,7 +89,9 @@ class Game:
     def __init__(self, screen) -> None:
         self.word: str = "landon"
         self.input_buffer: str | None = None
-        self.guessed_letters: set[str] = {"a", "l"}
+        self.guessed_letters: set[str] = set()
+        self.incorrect_guesses: int = 0
+        self.screen = screen
 
         curses.curs_set(False)
         screen.refresh()
@@ -114,8 +120,8 @@ class Game:
 
         self.game_window: GameWindow = GameWindow(game_width, game_height, game_x_pos, game_y_pos, self.word, self.guessed_letters)
 
-    def process_input(self, key) -> None:
-        if key == curses.KEY_ENTER:
+    def process_input(self, key: int) -> None:
+        if key == 10: # Key code for ENTER
             if self.input_buffer is None:
                 return
 
@@ -127,43 +133,60 @@ class Game:
                 self.word_bank_window.guessed_letters.add(self.input_buffer)
                 self.game_window.guessed_letters.add(self.input_buffer)
                 self.input_buffer = None
-                return
 
             else:
                 self.guessed_letters.add(self.input_buffer)
                 self.word_bank_window.guessed_letters.add(self.input_buffer)
                 self.game_window.guessed_letters.add(self.input_buffer)
                 self.input_buffer = None
-                return
+                self.incorrect_guesses += 1
+
+            self.image_window.image = self.image_window.images[str(self.incorrect_guesses)]
+            self.image_window.render_image()
+            self.word_bank_window.render_bank()
+            self.game_window.render_text()
         else:
-            letter: str = re.search(r'^[a-z]$', key).group()
+            key_char: chr = chr(key)
+
+            letter: re.Match[str] | None = re.search(r'^[a-z]$', key_char)
 
             if letter is None:
                 return
 
             else:
-                self.input_buffer = key
+                self.input_buffer = key_char
                 return
+
+    def game_loop(self) -> None:
+        while True:
+            key: int = self.screen.getch()
+            self.process_input(key)
+
 
 def main(screen) -> int:
     if curses.COLS < 150 or curses.LINES < 50:
         return 1
 
-    curses.init_pair(1, curses.COLOR_RED, curses.COLOR_WHITE)
-    curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_WHITE)
+    curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
+    curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
 
     screen.bkgd(' ', curses.color_pair(1))
 
     game = Game(screen)
 
     game.word_bank_window.render_bank()
+    game.game_loop()
 
-    i = 1
-    while i < 11:
-        game.image_window.image = game.image_window.images[str(i)]
-        game.image_window.render_image()
-        screen.getch()
-        i = i + 1
+    # i = 1
+    # while i < 11:
+    #     game.image_window.image = game.image_window.images[str(i)]
+    #     game.image_window.render_image()
+    #     key: int = screen.getch()
+    #     if key == 10:
+    #         return 1
+    #
+    #     print(chr(key))
+    #     i = i + 1
 
     return 0
 
