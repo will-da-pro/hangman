@@ -24,7 +24,7 @@ class ImageWindow(Window):
         super().__init__(width, height, x_pos, y_pos)
 
         self.images = self.load_json('assets/images.json')["images"]
-        self.image = self.images['0']
+        self.image = self.images[0]
 
         self.render_image()
 
@@ -63,6 +63,7 @@ class GameWindow(Window):
 
         self.word: str = word
         self.guessed_letters: set[str] = guessed_letters
+        self.input_buffer: str | None = None
 
         self.render_text()
 
@@ -83,6 +84,17 @@ class GameWindow(Window):
         y_pos: int = 3
 
         self.window.addstr(y_pos, x_pos, text, curses.color_pair(1))
+        self.window.refresh()
+
+    def render_buffer(self) -> None:
+        x_pos: int = 1
+        y_pos: int = 1
+
+        if self.input_buffer is None:
+            self.window.addstr(y_pos, x_pos, " ", curses.color_pair(1))
+        else:
+            self.window.addstr(y_pos, x_pos, self.input_buffer, curses.color_pair(1))
+
         self.window.refresh()
 
 class Game:
@@ -133,18 +145,21 @@ class Game:
                 self.word_bank_window.guessed_letters.add(self.input_buffer)
                 self.game_window.guessed_letters.add(self.input_buffer)
                 self.input_buffer = None
+                self.game_window.input_buffer = None
 
             else:
                 self.guessed_letters.add(self.input_buffer)
                 self.word_bank_window.guessed_letters.add(self.input_buffer)
                 self.game_window.guessed_letters.add(self.input_buffer)
                 self.input_buffer = None
+                self.game_window.input_buffer = None
                 self.incorrect_guesses += 1
 
-            self.image_window.image = self.image_window.images[str(self.incorrect_guesses)]
+            self.image_window.image = self.image_window.images[self.incorrect_guesses]
             self.image_window.render_image()
             self.word_bank_window.render_bank()
             self.game_window.render_text()
+            self.game_window.render_buffer()
         else:
             key_char: chr = chr(key)
 
@@ -155,6 +170,8 @@ class Game:
 
             else:
                 self.input_buffer = key_char
+                self.game_window.input_buffer = key_char
+                self.game_window.render_buffer()
                 return
 
     def game_loop(self) -> None:
